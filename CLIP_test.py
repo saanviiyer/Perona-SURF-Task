@@ -14,6 +14,9 @@ import torchvision.transforms as transforms
 
 from transformers import AutoProcessor, AutoModel, pipeline, CLIPModel, CLIPProcessor
 
+from tqdm import tqdm
+import wandb
+
 # lightning imports
 import os
 from torch import optim, utils, Tensor
@@ -86,9 +89,27 @@ def prepare_batch(batch_data):
         texts.append(f"a photo of a {category.replace('_', ' ')}")
         labels.append(label)
     
-    inputs = processor(text = texts, images = images, return_tensors = "pt", padding = True)
+    inputs = processor(text=texts, images=images, return_tensors="pt", padding=True)
     return inputs, torch.tensor(labels)
 
 train_loader = DataLoader(train_set, batch_size = 32, shuffle = True)
 val_loader = DataLoader(train_set, batch_size = 32, shuffle = False)
 test_loader = DataLoader(test_set, batch_size = 32, shuffle = False)
+
+class NN(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(),__init__()
+        self.fulCon1 = nn.Linear(input_size, 50)
+        self.fulCon2 = nn.Linear(50, num_classes)
+
+    def forward(self, x):
+        x = F.relu(self.fulCon1(x))
+        x = self.fulCon2(x)
+        return x
+    
+LEARNING_RATE = 0.001
+BATCH_SIZE = 64
+NUM_EPOCHS = 3
+model = NN(input_size=target_size, num_classes=num_categories)
+
+# Set Up
