@@ -59,7 +59,6 @@ testing_size = size - training_size - validation_size
 train_set, val_set, test_set = random_split(dataset, [training_size, validation_size, testing_size])
 
 processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
-clip_model = AutoModel.from_pretrained("openai/clip-vit-base-patch32")
 
 # use lightning module, define class
 class LightningCLIP(L.LightningModule):
@@ -112,4 +111,85 @@ BATCH_SIZE = 64
 NUM_EPOCHS = 3
 model = NN(input_size=target_size, num_classes=num_categories)
 
-# Set Up
+# set up
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# use w&b
+wandb.login()
+wandb.init(
+    project="CLIP-Caltech101-Manual-Loop",
+    config={
+        "learning_rate": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "num_epochs": NUM_EPOCHS,
+        "architecture": "CLIP_Embeddings + 2-Layer_NN",
+    }
+)
+
+clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(DEVICE)
+clip_model.requires_grad_(False) 
+clip_model.eval() 
+
+model = NN(input_size=512, num_classes=num_categories).to(DEVICE)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE) # gradient step
+
+print("Starting training...")
+for epoch in range(NUM_EPOCHS):
+    model.train()
+
+    for batch_idx, (data, targets) in enumerate(tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS}")):
+        data = data.to(device=DEVICE)
+        targets = targets.to(device=DEVICE)
+
+        with torch.no_grad():
+            embeddings = clip_model.get_image_features(pixel_values=data)
+
+        scores = model(embeddings)
+        loss = criterion(scores, targets)
+
+        wandb.log({"train_loss": loss.item()})
+
+        optimizer.zero_grad()
+        loss.backward()
+
+        optimizer.step()
+    
+
+def check_accuracy(loader, nn_model, clip_feature_extractor):
+    num_correct = 0
+    num_samples = 0
+    nn_model.eval() 
+    with torch.no_grad():
+        for x, y in tqdm(loader, desc="Checking accuracy"):
+            x = x.to(device=DEVICE)
+            y = y.to(device=DEVICE)
+
+            embeddings = clip_feature_extractor.get_image_features(pixel_values=x)
+
+            scores = nn_model(embeddings)
+            predictions = scores.max(1)[1]
+
+            num_correct += (predictions == y).sum()
+
+            num_samples += predictions.size(0)
+
+    nn_model.train()
+    accuracy = (num_correct / num_samples) * 100
+    return accuracy
+
+print("Checking accuracy...")
+train_acc = check_accuracy(train_loader, model, clip_model)
+test_acc = check_accuracy(test_loader, model, clip_model)
+
+print(f"Accuracy on training set: {train_acc:.2f}%")
+print(f"Accuracy on test set: {test_acc:.2f}%")
+
+wandb.log({
+    "final_train_accuracy": train_acc,
+    "final_test_accuracy": test_acc
+})
+
+wandb.finish()
