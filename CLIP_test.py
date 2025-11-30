@@ -59,3 +59,36 @@ processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
 clip_model = AutoModel.from_pretrained("openai/clip-vit-base-patch32")
 
 # use lightning module, define class
+class LightningCLIP(L.LightningModule):
+    def __init__(self, encoder, decoder):
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+    
+    def training_step(self, batch, batch_index):
+        x = batch[0]
+        x = x.view(x.size(0), -1)
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+
+        loss = F.mse_loss(x_hat, x)
+
+        return loss
+
+def prepare_batch(batch_data):
+    images = []
+    texts = []
+    labels = []
+
+    for image, label in batch_data:
+        images.append(image)
+        category = dataset.categories[label]
+        texts.append(f"a photo of a {category.replace('_', ' ')}")
+        labels.append(label)
+    
+    inputs = processor(text = texts, images = images, return_tensors = "pt", padding = True)
+    return inputs, torch.tensor(labels)
+
+train_loader = DataLoader(train_set, batch_size = 32, shuffle = True)
+val_loader = DataLoader(train_set, batch_size = 32, shuffle = False)
+test_loader = DataLoader(test_set, batch_size = 32, shuffle = False)
