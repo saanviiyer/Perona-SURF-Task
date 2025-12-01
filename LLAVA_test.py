@@ -9,6 +9,12 @@ from PIL import Image
 from tqdm import tqdm
 import wandb
 
+"""
+OBJECTIVES: 
+
+"""
+
+
 wandb.login()
 wandb.init(
     project="LLaVA-Caltech101-ZeroShot",
@@ -43,18 +49,14 @@ full_dataset = datasets.Caltech101(
 )
 class_names = full_dataset.categories
 
-torch.manual_seed(42)
+torch.manual_seed(42) # same "randomization" every time
 train_size = int(0.7 * len(full_dataset))
 val_size = int(0.15 * len(full_dataset))
 test_size = len(full_dataset) - train_size - val_size
 
-test_dataset = random_split(
-    full_dataset, [train_size, val_size, test_size]
-)[2]
+train_set, val_set, test_set = random_split(full_dataset, [train_size, val_size, test_size])
 
-test_loader_pil = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-print(f"loaded {len(test_dataset)} test images")
+print(f"loaded {len(test_set)} test images")
 
 num_correct = 0
 num_samples = 0
@@ -65,7 +67,7 @@ with torch.no_grad():
     num_test_images = 300
     for i in tqdm(range(num_test_images), desc="Evaluating LLaVA"):
 
-        pil_image, label_int = test_dataset[i]
+        pil_image, label_int = test_set[i]
 
         label_name = class_names[label_int]
 
@@ -100,7 +102,7 @@ with torch.no_grad():
             print(f"Ground Truth: {label_name}")
 
 accuracy = (num_correct / num_samples) * 100
-print(f"LLaVA Zero-Shot Accuracy on {num_samples} images: {accuracy:.2f}%")
+print(f"LLaVA Accuracy on {num_samples} images: {accuracy:.2f}%")
 
 wandb.log({
     "llava_zero_shot_accuracy": accuracy,
@@ -109,3 +111,12 @@ wandb.log({
 })
 
 wandb.finish()
+
+
+# BONUS!!!
+
+# make PCA (dimensionality reduction technique) plot of LLaVA intermediate activations for images from 2 distinct classes in dataset
+# make 5 plots for 5 intermediate layers
+# original dimensions of embeddings
+# where did i find LLaVA embeddings, why?
+# difference between different intermediate layers?
