@@ -11,7 +11,11 @@ import wandb
 
 """
 OBJECTIVES: 
-
+- Tests pre-trained "chatbot" model, see if it can correctly identify objects in pictures without any specific training.
+- Fetch item in the dataset by looping through
+- Create text prompt based on chat template trained with LLaVA
+- If actual answer is at all in the model's output, count it as a correct output
+- Log results in wandb
 """
 
 
