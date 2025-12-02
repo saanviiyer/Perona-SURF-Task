@@ -9,6 +9,11 @@ from PIL import Image
 from tqdm import tqdm
 import wandb
 
+import numpy as np
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 """
 OBJECTIVES: 
 - Tests pre-trained "chatbot" model, see if it can correctly identify objects in pictures without any specific training.
@@ -120,8 +125,35 @@ wandb.finish()
 # BONUS!!!
 
 # make PCA (dimensionality reduction technique) plot of LLaVA intermediate activations for images from 2 distinct classes in dataset
-# make 5 plots for 5 intermediate layers
-# original dimensions of embeddings
-# where did i find LLaVA embeddings, why?
-# difference between different intermediate layers?
+# choose first two classes
+
+class_1 = "accordion"
+class_2 = "airplanes"
+sample_count = 50
+
+class_1_inds = []
+class_2_inds = []
+
+for index in range(len(full_dataset)):
+
+    item_label = full_dataset[index][1]
+
+    if item_label == class_1:
+        class_1_inds.append(index)
+
+        if len(class_1_inds) == sample_count:
+            break
+
+
+for index in range(len(full_dataset)):
+
+    item_label = full_dataset[index][1]
+
+    if item_label == class_2:
+        class_2_inds.append(index)
+
+        if len(class_2_inds) == sample_count:
+            break
+
+combined_inds = class_1_inds + class_2_inds
 
