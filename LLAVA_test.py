@@ -157,3 +157,86 @@ for index in range(len(full_dataset)):
 
 combined_inds = class_1_inds + class_2_inds
 
+# broadcast so 0 corresponds to class 1, 1 corresponds to class 2
+labels = np.array([0] * len(class_1_inds) + [1] * len(class_2_inds))
+class_names = [class_1, class_2]
+
+
+# pick 5 intermediate layers between 0 to 31
+layers_plot = [0, 7, 14, 21, 31]
+
+layer_vectors = {}
+
+for i in layers_plot:
+    layer_vectors[i] = []
+
+with torch.no_grad():
+    for index in tqdm(combined_inds, desc="Processing images"):
+        pil_image, label_int = full_dataset[index]
+
+        prompt = f"USER: <image>\nWhat object is in this image? ASSISTANT:"
+
+        inputs = processor(
+            text=prompt, 
+            images=pil_image, 
+            return_tensors="pt"
+        ).to(model.device, dtype=torch.float16)
+
+        # forward pass
+        outputs = model(
+            **inputs, 
+            output_hidden_states=True 
+        )
+
+        for layer_index in layers_plot:
+            hidden_layer = outputs.hidden_state[layer_index]
+            last_token_vec = hidden_layer[0, -1, :].cpu().numpy()
+            layer_vectors[layer_index].append(last_token_vec)
+
+# run PCA
+
+fig, axes = plt.subplots(1, 5, figsize=(25, 5))
+
+for i, layer_idx in enumerate(layers_plot):
+    
+    X = np.vstack(layer_vectors[layer_idx])
+    
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X)
+    
+    ax = axes[i]
+    sns.scatterplot(
+        x=X_pca[:, 0], 
+        y=X_pca[:, 1], 
+        hue=labels, 
+        palette="deep", 
+        legend="full", 
+        ax=ax
+    )
+    
+    ax.set_title(f"PCA of Layer {layer_idx} Activations")
+    ax.set_xlabel("Principal Component 1")
+    ax.set_ylabel("Principal Component 2")
+    
+    handles, _ = ax.get_legend_handles_labels()
+    ax.legend(handles, class_names, title="Class")
+
+plt.suptitle("PCA of LLaVA Intermediate Layer Activations (Last Token)", fontsize=16, y=1.05)
+plt.tight_layout()
+plt.show()
+
+print("Initializing new W&B run for PCA plot...")
+wandb.init(
+    project="LLaVA-Caltech101-ZeroShot", 
+    name="PCA_Layers_Analysis"
+)
+
+wandb.log({"PCA_Layers_Plot": fig})
+print("PCA plots generated and logged to W&B.")
+
+wandb.finish()
+
+# FIND DIMENSIONALITY:
+
+dimensionality = layer_vectors[0][0].size
+
